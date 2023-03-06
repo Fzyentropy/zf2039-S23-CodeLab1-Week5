@@ -11,29 +11,48 @@ using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
-    public static GameManager GM;
-    public static int currentLevel = 0;
-    public static int gameObjectArray;
-    private const int highestLevel = 7;             // 总共关卡数：8
-    private static bool isLoadingLevel = false;
-    public static bool isMovable = true;          // 是否可操作
 
-    public GameObject blackScreen;
-    public GameObject txt;
-
-    private const string DIR_DATA = "/Data/";
-    private const string FILE_STORY_START = "Story_Start.txt";
-    private const string FILE_STORY_END = "Story_End.txt";
+    // FILE RELEVANCE
+    
+    private const string DIR_DATA = "/Text/";
+    private const string FILE_LEVEL = "Level";
+    private const string FILE_FILETYPE_TXT = ".txt";
+    private const string FILE_STORY_START = "Story_Start";
+    private const string FILE_STORY_END = "Story_End";
 
     private string PATH_STORY_START;
     private string PATH_STORY_END;
     
+    // LEVEL RELEVANCE
     
+    public static GameManager GM;
+    [SerializeField] public static int currentLevel = 1;
+    public static int gameObjectArray;
+    private const int highestLevel = 7;             // 总共关卡数：8
+    private static bool isLoadingLevel = false;
+    public static bool isMovable = true;          // 是否可操作
+    public GameObject levelInstanceHolder;
 
+    public GameObject wall;
+    public GameObject player;
+    public GameObject exit;
+    public GameObject x;
+
+    public float xOffset;
+    public float yOffset;
+    
+    // UI RELEVANCE
+    
+    public GameObject blackScreen;
+    public GameObject txt;
+
+    
+    
+    
     private void Awake()
     {
         
-        if (GM == null)
+        if (GM == null)                              // Singleton
         {
             DontDestroyOnLoad(gameObject);
             GM = this;
@@ -46,18 +65,6 @@ public class GameManager : MonoBehaviour
         
         isLoadingLevel = false;             // 加载关卡锁解开
         Time.timeScale = 1;                // 
-
-        currentLevel = SceneManager.GetActiveScene().buildIndex;        //让 currentlevel 值等于当前场景编号
-        
-        gameObjectArray = GameObject.FindGameObjectsWithTag("Player").Length;        // initialize gameobject array
-        Debug.Log("at awake, gameobjectarray:"+gameObjectArray);
-        
-        Debug.Log("level"+currentLevel+"awaked" );
-        
-
-        
-
-        
         
 
     }
@@ -66,7 +73,7 @@ public class GameManager : MonoBehaviour
     
     void Start()
     {
-        if (currentLevel == 0)
+        if (currentLevel == 1)
         {
             StartCoroutine(StoryStart());
 
@@ -82,7 +89,7 @@ public class GameManager : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.R))
         {
-            SceneManager.LoadScene(GameManager.currentLevel, LoadSceneMode.Single);
+            LoadLevelAccordingToTxt();
             
         }
         
@@ -94,9 +101,9 @@ public class GameManager : MonoBehaviour
             if ((currentLevel < highestLevel)&(!isLoadingLevel))            // 不是最后一关 且 没在加载关卡
             {
                 isLoadingLevel = true;
-                Debug.Log("is loading level:"+ isLoadingLevel);
+                
                 currentLevel++;
-                SceneManager.LoadScene(GameManager.currentLevel, LoadSceneMode.Single);
+                LoadLevelAccordingToTxt();
             }
 
             if ((currentLevel == highestLevel)&(!isLoadingLevel))        // 最后一关
@@ -104,8 +111,7 @@ public class GameManager : MonoBehaviour
                 // 游戏胜利
                 isLoadingLevel = true;
                 StartCoroutine(StoryEnd());
-                
-                Debug.Log("shit" );
+
             }
         }
         
@@ -113,11 +119,93 @@ public class GameManager : MonoBehaviour
     }
 
 
+
+
+    public void LoadLevelAccordingToTxt()
+    {
+
+        int levelToLoad = currentLevel;
+        string PATH_FILE_LEVELINDEX = Application.dataPath + DIR_DATA + FILE_LEVEL + levelToLoad + FILE_FILETYPE_TXT;
+
+        if (File.Exists(PATH_FILE_LEVELINDEX))
+        {
+            
+            // 清空当前关卡
+            
+            if (levelInstanceHolder == null) { levelInstanceHolder = GameObject.Find("levelInstanceHolder");}
+            Destroy(levelInstanceHolder);
+            levelInstanceHolder = new GameObject("levelInstanceHolder");
+            levelInstanceHolder.transform.position = new Vector3(0, 0, 0);
+
+            gameObjectArray = 0;
+
+
+            // 从txt读取并放置
+
+            string[] levelLine = File.ReadAllLines(PATH_FILE_LEVELINDEX);
+            GameObject Agent = null;
+
+            for (int yPos = 0; yPos < levelLine.Length; yPos++)
+            {
+                for (int xPos = 0; xPos < levelLine[yPos].Length; xPos++)
+                {
+
+                    switch (levelLine[yPos][xPos])
+                    {
+                        case 'W':
+                        {
+                            Agent = Instantiate<GameObject>(wall);
+                            break;
+                        }
+                        case 'P':
+                        {
+                            Agent = Instantiate<GameObject>(player);
+                            gameObjectArray++;
+                            break;
+                        }
+                        case 'E':
+                        {
+                            Agent = Instantiate<GameObject>(exit);
+                            break;
+                        }
+                        case 'X':
+                        {
+                            Agent = Instantiate<GameObject>(x);
+                            break;
+                        }
+                        default: 
+                            break;
+                    }
+
+                    if (Agent != null)
+                    {
+                        Agent.transform.position = 
+                            new Vector2
+                            (
+                                xOffset + xPos, 
+                                yOffset - yPos
+                            );
+
+                        Agent.transform.parent = levelInstanceHolder.transform;
+                    }
+                    
+                }
+                
+            }
+            
+        }
+        
+
+    }
+    
+    
+    
+
     IEnumerator StoryStart()
     {
         isMovable = false;
         
-        PATH_STORY_START = Application.dataPath + DIR_DATA + FILE_STORY_START;
+        PATH_STORY_START = Application.dataPath + DIR_DATA + FILE_STORY_START + FILE_FILETYPE_TXT;
         
         blackScreen = GameObject.Find("Black");
         txt = GameObject.Find("TXT");
@@ -147,15 +235,17 @@ public class GameManager : MonoBehaviour
 
         while (true)
         {
-            if (txt.GetComponent<TMP_Text>().color.a >= 1)
-            { Debug.Log("break"); break; }
+            if (txt.GetComponent<TMP_Text>().color.a >= 1)  { break; }
 
             txt.GetComponent<TMP_Text>().color = new Color(1,1,1,txt.GetComponent<TMP_Text>().color.a + textFadeSpeed);
-            Debug.Log("waht");
 
             yield return new WaitForSeconds(textFadeTime);
             
         }
+        
+        
+        // 加载关卡
+        LoadLevelAccordingToTxt();         
         
         
         // last 10 secs
@@ -180,7 +270,7 @@ public class GameManager : MonoBehaviour
         isMovable = false;
         GameObject.FindWithTag("Player").GetComponent<Rigidbody2D>().velocity = new Vector2(0f,0f);
         
-        PATH_STORY_END = Application.dataPath + DIR_DATA + FILE_STORY_END;
+        PATH_STORY_END = Application.dataPath + DIR_DATA + FILE_STORY_END + FILE_FILETYPE_TXT;
         
         blackScreen = GameObject.Find("Black");
         txt = GameObject.Find("TXT");

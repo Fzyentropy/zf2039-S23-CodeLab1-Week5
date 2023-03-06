@@ -11,7 +11,7 @@ public class XReload : MonoBehaviour
     {
         if (col.CompareTag("Player"))
         {
-            SceneManager.LoadScene(GameManager.currentLevel, LoadSceneMode.Single);       // reload scene
+            GameManager.GM.LoadLevelAccordingToTxt();
         }
     }
 }
